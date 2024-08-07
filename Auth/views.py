@@ -1,138 +1,238 @@
-from django.shortcuts import render, reverse
-from django.urls import reverse_lazy
-from django.views.generic.base import TemplateView
-from django.views.generic.edit import FormView, View
-from django.contrib.auth import login, authenticate
+from uuid import uuid4
 from django.contrib.auth.models import User
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import LogoutView
-from django_otp.plugins.otp_totp.models import TOTPDevice
-
-from Auth.utils import send_welcome_email, create_otp_device
-from .forms import LoginForm, SignUpForm, OTPForm
-
-
-# from django.shortcuts import render, redirect
-# from django.contrib import messages
-# from django.views import View
-# from django_otp import devices_for_user
-#
-# class OTPVerifyView(View):
-#     def get(self, request, *args, **kwargs):
-#         return render(request, 'otp_verify.html')
-#
-#     def post(self, request, *args, **kwargs):
-#         otp = request.POST.get('otp')
-#         user = request.user
-#         for device in devices_for_user(user):
-#             if device.verify_token(otp):
-#                 device.throttle_reset()
-#                 request.session['otp_verified'] = True
-#                 return redirect('some_secure_view')
-#         messages.error(request, 'Invalid OTP')
-#         return render(request, 'otp_verify.html')
-class HomeView(LoginRequiredMixin, TemplateView):
-    login_url = reverse_lazy("auth-login")
-    template_name = "home.html"
-
-    def get(self, request, *args, **kwargs):
-        # device = TOTPDevice.objects.filter(user=request.user).first()
-        device = create_otp_device(request.user)
-        # Generate OTP
-        otp = device
-        print("OTP", otp)
-        # Verify OTP
-        # is_valid = device.verify_token(otp)
-
-        return super().get(request, *args, **kwargs)
+from django.utils import timezone
+from django.utils.crypto import secrets
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
+from .utils import regenerate_otp, send_otp_email
+from Auth.models import OTPResendRefrence, OTPUser
+from .throttling import OTPRequestThrottle
+from .serializers import (
+    OTPSerializer,
+    SignInSerializer,
+    SignUpSerializer,
+    UserSerializer,
+)
 
 
-class LogOutView(LoginRequiredMixin, LogoutView):
-    login_url = reverse_lazy("auth-login")
-    next_page = reverse_lazy("auth-login")
+class Home(APIView):
+    def get(self, request):
+        return Response({"message": "Hello World"})
 
 
-class SignUpView(FormView):
-    template_name = "signup.html"
-    form_class = SignUpForm
-    success_url = reverse_lazy("home")  # Redirect to home after successful signup
+class SignUpView(APIView):
+    permission_classes = [AllowAny]
 
-    def form_valid(self, form):
-        # Save the user
-        user = form.save()
-        user.refresh_from_db()  # Load the profile instance created by the signal
-        user.save()
+    def post(self, request):
+        # fields required by the serializer ["username", "email", "password1", "password2"]
+        serializer = SignUpSerializer(data=request.data)
+        if serializer.is_valid():
+            # if sent user data is valid, it's saved
+            new_user = serializer.save()
+            # create an OTP user from the newly created user
+            otp_user = OTPUser.objects.create(user=new_user)
+            otp_resend_ref = OTPResendRefrence.objects.create(user=new_user)
+            # generate otp that will activate the newly create account
+            otp = otp_user.generate_otp
 
-        # Authenticate and login the user
-        raw_password = form.cleaned_data.get("password1")
-        user = authenticate(username=user.username, password=raw_password)
-        if user is not None:
-            login(self.request, user)
+            return Response(
+                {
+                    "message": "OTP sent to email.",
+                    "user_id": new_user.id,
+                    "otp": otp,
+                    "otp_resend_token": otp_resend_ref.token,
+                },
+                status=status.HTTP_200_OK,
+            )
+            # temp_email = "noahkibuule3@gmail.com"
+            # send an otp via email to the provided user email
+            # send_otp_email(temp_email, otp)
+            # response back with the username and email
+            # return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # response with the errors occuried
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return super().form_valid(form)
 
-    def form_invalid(self, form):
-        # Get username suggestions if the username is already taken
-        suggestions = form.get_suggestions()
-        return self.render_to_response(
-            self.get_context_data(form=form, suggestions=suggestions)
+# class SignInView(APIView): ...
+class SignInView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SignInSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            # if the serializer is not valid
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username = request.data.get("username")
+        password = request.data.get("password")
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User does not exist."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not user.check_password(password):
+            return Response(
+                {"error": "Incorrect password."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generate and send OTP
+        otp_user = OTPUser.objects.filter(user=user).first()
+        otp_resend_ref = OTPResendRefrence.objects.filter(user=user).first()
+
+        if not otp_user:
+            # if the user has not been registered for OTP yet
+            return Response(
+                {"error": "OTP user Not Found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        otp = otp_user.generate_otp
+        otp_resend_ref.token = str(uuid4())
+        otp_resend_ref.save()
+
+        return Response(
+            {
+                "message": "OTP sent to email.",
+                "user_id": user.id,
+                "otp": otp,
+                "otp_resend_token": otp_resend_ref.token,
+            },
+            status=status.HTTP_200_OK,
+        )
+        # send_otp_email(user.email, otp)
+
+        # return Response({"message": "OTP sent to email."}, status=status.HTTP_200_OK)
+
+
+# class SignOutView(APIView): ...
+
+
+class SignOutView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get("refresh_token")
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(
+                {"message": "Successfully logged out."}, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class OTPView(APIView):
+    throttle_classes = [OTPRequestThrottle]
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user = User.objects.get(id=request.data["user_id"])
+        res_int, res_str = regenerate_otp(user, request.data["otp_resend_token"])
+        if res_int == 0:
+            return Response({"error": res_str}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"otp": res_int, "otp_resend_token": res_str},
+            status=status.HTTP_201_CREATED,
         )
 
+    def post(self, request):
+        serializer = OTPSerializer(data=request.data)
 
-class SignInView(FormView):
-    form_class = LoginForm
-    template_name = "signin.html"
-    success_url = reverse_lazy("home")  # Redirect to home after successful signup
+        if not serializer.is_valid():
+            # if the serializer is not valid
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.get(id=int(serializer.data["user_id"]))
+        if not user:
+            # if the user doesn't exist
+            return Response({"user": "NOT FOUND"}, status=status.HTTP_404_NOT_FOUND)
 
-    def form_valid(self, form):
-        username = form.cleaned_data["username"]
-        password = form.cleaned_data["password"]
+        otp_token = serializer.data["otp"]
+        otp_user = OTPUser.objects.filter(user=user).first()
 
-        user_exists = User.objects.filter(username=username).first()
-
-        if user_exists:
-            user = authenticate(
-                self.request,
-                username=username,
-                password=password,
+        if not otp_user:
+            # if the user has not been registered for OTP yet
+            return Response(
+                {"error": "OTP user Not Found"}, status=status.HTTP_404_NOT_FOUND
             )
-            if user:
-                login(self.request, user)
-                return super().form_valid(form)
-            return self.render_to_response(
-                self.get_context_data(
-                    username=username, message="Wrong password for that user name"
-                )
+
+        is_otp_valid = otp_user.verify_otp(int(otp_token))
+
+        if not is_otp_valid:
+            # if OTP provided by user is Invalid
+            return Response(
+                {"error": "Invalid OTP"},
+                status=status.HTTP_403_FORBIDDEN,
             )
-        return self.render_to_response(
-            self.get_context_data(message="User name doesn't exists")
-        )
+
+        if otp_user.first_seen:
+            # if it's the first time for user to get OTP
+            # activate user account
+            user.is_active = True
+            # mark the user as seen already
+            otp_user.first_seen = False
+            # save to data base
+            user.save()
+            otp_user.save()
+
+        # user_credentials = {"username", p}
+        tokens = self.get_tokens(user)
+        return Response(tokens, status=status.HTTP_201_CREATED)
+
+    def get_tokens(self, user):
+        # manually generate refresh and access_token tokens
+        refresh = RefreshToken.for_user(user)
+        return {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
 
 
-class OTPConfirmView(View):
-    template_name = "otp-confirm.html"
-    form_class = OTPForm
-
-    def get(self, request, *args, **kwargs):
-        form = self.form_class()
-        return render(request, self.template_name, {"form": form})
-
-    # def post(self, request, *args, **kwargs):
-    #     form = self.form_class(request.POST)
-    #     if form.is_valid():
-    #         otp = form.cleaned_data['otp']
-    #         try:
-    #             otp_object = OTP.objects.get(code=otp, user=request.user, is_verified=False)
-    #             time_diff = timezone.now() - otp_object.created_at
-    #             # Assuming OTP is valid for 10 minutes
-    #             if time_diff.total_seconds() > 600:
-    #                 messages.error(request, "OTP has expired.")
-    #             else:
-    #                 otp_object.is_verified = True
-    #                 otp_object.save()
-    #                 messages.success(request, "OTP verified successfully.")
-    #                 return redirect('success_page')  # Redirect to a success page or dashboard
-    #         except OTP.DoesNotExist:
-    #             messages.error(request, "Invalid OTP.")
-    #
-    #     return render(request, self.template_name, {'form': form})
+# class OTP(APIView):
+#     permission_classes = [AllowAny]
+#
+#     def get(self, request):
+#         # user = User.objects.get_by_natural_key("tristar3")
+#         # serialized_user = UserSerializer(user)
+#         # if serialized_user.is_valid():
+#         #     return Response({"user": serialized_user.data}, status=status.HTTP_200_OK)
+#         # return Response(serialized_user.errors, status=status.HTTP_400_BAD_REQUEST)
+#
+#         # if user:
+#         #     otp_user = OTPUser.objects.filter(user=user).first()
+#         #     if not otp_user:
+#         #         otp_user = OTPUser.objects.create(user=user)
+#         #
+#         #     return Response(
+#         #         {"user": user.email, "otp": otp_user.generate_otp, "key": otp_user.key},
+#         #         status=status.HTTP_200_OK,
+#         #     )
+#         return Response({"user": "NOT FOUND"}, status=status.HTTP_404_NOT_FOUND)
+#
+#     def post(self, request):
+#         user = User.objects.get_by_natural_key("tristar3")
+#         if not user:
+#             return Response({"user": "NOT FOUND"}, status=status.HTTP_404_NOT_FOUND)
+#
+#         serializer = OTPSerializer(data=request.data)
+#         if serializer.is_valid():
+#             otp_token = serializer.data["otp"]
+#             otp_user = OTPUser.objects.filter(user=user).first()
+#             if not otp_user:
+#                 return Response(status=status.HTTP_403_FORBIDDEN)
+#             is_otp_valid = otp_user.verify_otp(int(otp_token))
+#             return Response(
+#                 {
+#                     "otp": otp_token,
+#                     "user_otp": otp_user.generate_otp,
+#                     "user_key": otp_user.key,
+#                     "is_valid": is_otp_valid,
+#                 },
+#                 status=status.HTTP_200_OK,
+#             )
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#
