@@ -1,0 +1,478 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head lang="en">
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+    <title>Template Documentation Template</title>
+    <!-- Framework CSS -->
+    <link
+      rel="stylesheet"
+      href="assets/blueprint-css/screen.css"
+      type="text/css"
+      media="screen, projection"
+    />
+    <link
+      rel="stylesheet"
+      href="assets/blueprint-css/print.css"
+      type="text/css"
+      media="print"
+    />
+    <!--[if lt IE 8
+      ]><link
+        rel="stylesheet"
+        href="assets/blueprint-css/ie.css"
+        type="text/css"
+        media="screen, projection"
+    /><![endif]-->
+    <link
+      rel="stylesheet"
+      href="assets/blueprint-css/plugins/fancy-type/screen.css"
+      type="text/css"
+      media="screen, projection"
+    />
+    <link rel="stylesheet" type="text/css" href="assets/prism/prism.css">
+    <style type="text/css" media="screen">
+      p,
+      table,
+      .box {
+        margin-bottom: 25px;
+      }
+      .box p {
+        margin-bottom: 10px;
+      }
+    .indent {
+      --indent-size: 2rem;
+      margin-left: var(--indent-size);
+    }
+    hr{
+      margin-bottom: 5rem;
+    }
+    pre{
+      margin: 2rem;
+    }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h3 class="center alt">
+        &ldquo;Django Vault&rdquo; Documentation by &ldquo;Kibuule Noah&rdquo;
+        v1.0
+      </h3>
+
+      <hr />
+
+      <h1 class="center">&ldquo;Django Vault&rdquo;</h1>
+
+      <div class="borderTop">
+        <div class="span-6 colborder info prepend-1">
+          <p class="prepend-top">
+            <strong>
+              Created: 08/09/2024<br />
+              By: Kibuule Noah<br />
+              Email:
+              <a href="mailto:noahkibuule3@gmail.com">noahkibuule3@gmail.com</a>
+            </strong>
+          </p>
+        </div>
+        <!-- end div .span-6 -->
+
+        <div class="span-12 last">
+          <p class="prepend-top append-0">
+            Thank you for purchasing my theme. If you have any questions that
+            are beyond the scope of this help file, please feel free to email
+            via my user page contact form
+            <a href="http://themeforest.net/user/USERNAME">here</a>. Thanks so
+            much!
+          </p>
+        </div>
+      </div>
+
+      <hr />
+
+      <h2 id="toc" class="alt">Table of Contents</h2>
+      <ol class="alpha">
+        <li><a href="#introduction">Introduction</a></li>
+        <li><a href="#authenticationFlow">Authentication Flow</a></li>
+        <li><a href="#rateLimiting">Rate Limiting</a></li>
+        <li><a href="#gettingStarted">Getting Started</a></li>
+        <li><a href="#tokenManagement">Token Management</a></li>
+        <li><a href="#integrationExamples">Integration Examples</a></li>
+      </ol>
+
+      <hr />
+
+      <h3 id="introduction">
+        <strong>A) Introduction</strong> - <a href="#toc">top</a>
+      </h3>
+      <p>
+        Django Vault is a robust and secure authentication API built with
+        Django, Django REST Framework (DRF), and `dj-rest-auth` in combination
+        with `dj-simple-jwt`. It is designed to provide a scalable and flexible
+        solution for managing user authentication, token-based authorization,
+        and secure access to protected resources. With Django Vault, developers
+        can effortlessly integrate user authentication into their Django
+        projects, leveraging the power of JWT (JSON Web Token) for secure,
+        stateless authentication. The API offers a comprehensive set of
+        features, including user registration, login, logout, password
+        management, and token refresh capabilities. Django Vault is built with
+        security best practices in mind, ensuring that user data and access
+        tokens are handled with the highest level of integrity. Whether you are
+        developing a single-page application (SPA), a mobile app, or a
+        traditional web application, Django Vault provides the tools you need to
+        manage user sessions and protect your API endpoints with minimal
+        configuration and maximum flexibility.
+      </p>
+
+      <hr />
+
+      <h3 id="authenticationFlow">
+        <strong>B) Authentication Flow</strong> -
+        <a href="#toc" class="">top</a>
+      </h3>
+
+      <p>
+      <ol class="indent">
+        <li>
+          <h4>
+            <strong>User Registration</strong>
+          </h4>
+          <p class="indent">
+          <strong>Endpoint:</strong> /api/auth/signup/
+          <p class="indent">New users can create an account by providing their email, username, and password.</p>
+          <ol class="indent">
+            <h4><strong>Process:</strong></h4>
+            <li class="indent">The user submits a registration request with their details.</li>
+            <li class="indent">The server validates the input and creates a new user record in the database.</li>
+            <li class="indent">An activation 6 digit OTP code is sent to the user's email</li>
+            <li class="indent">Once the account is confirmed, the user gets a refresh and access token that can be used to log in.</li>
+          </ol>
+          </p>
+        </li>
+
+        <li>
+          <h4>
+            <strong>User Login</strong>
+          </h4>
+          <p class="indent">
+          <strong>Endpoint:</strong> /api/auth/signin/
+          <p class="indent">Existing users can log in by submitting their username and password. </p>
+          <ol class="indent">
+            <h4><strong>Process:</strong></h4>
+            <li class="indent">The user submits their login credentials (username and password).</li>
+            <li class="indent">The server verifies the credentials and, if valid, an OTP code is sent to the user's email</li> 
+            <li class="indent">If the user submits the OTP within 3mins,if valid, the server generates an access token and a refresh token to authenticate the user.</li>
+            <li class="indent">The tokens are returned to the user, who can now use the access token to authenticate further requests.</li>
+          </ol>
+          </p>
+        </li>
+
+        <!-- <li> -->
+        <!--   <h4> -->
+        <!--     <strong>Token Authentication</strong> -->
+        <!--   </h4> -->
+        <!--   <p class="indent"> -->
+        <!--   <strong>Endpoint:</strong> /api/auth/register/ -->
+        <!--   <p>Users must include the access token in the Authorization header to access protected resources. </p> -->
+        <!--   <ol class="indent"> -->
+        <!--     <h4><strong>Process:</strong></h4> -->
+        <!--     <li class="indent">The user includes the access token in the `Authorization: Bearer <token>` header of their request.</li> -->
+        <!--     <li class="indent">The server checks the token’s validity, ensuring it hasn’t expired or been tampered with.</li> -->
+        <!--     <li class="indent">If valid, the server processes the request and returns the appropriate response.</li> -->
+        <!--   </ol> -->
+        <!--   </p> -->
+        <!-- </li> -->
+
+        <li>
+          <h4>
+            <strong>Token Refresh</strong>
+          </h4>
+          <p class="indent">
+          <strong>Endpoint:</strong> /api/auth/token/refresh/
+          <p class="indent">When the access token expires, users can obtain a new one using the refresh token.</p>
+          <ol class="indent">
+            <h4><strong>Process:</strong></h4>
+            <li class="indent">The user submits a refresh token request with the refresh token.</li>
+            <li class="indent">The server verifies the refresh token and, if valid, generates a new access token.</li>
+            <li class="indent">The new access token is returned to the user for continued use.</li>
+          </ol>
+          </p>
+        </li>
+
+        <li>
+          <h4>
+            <strong>User Logout</strong>
+          </h4>
+          <p class="indent">
+          <strong>Endpoint:</strong> /api/auth/signout/
+          <p class="indent">Users can log out, invalidating their current authentication tokens.</p>
+          <ol class="indent">
+            <h4><strong>Process:</strong></h4>
+            <li class="indent">The user submits a logout request.</li>
+            <li class="indent">The server invalidates the user’s tokens, effectively logging them out.</li>
+            <li class="indent">The user must log in again to obtain new tokens if they wish to continue using the service.</li>
+        
+          </ol>
+          </p>
+        </li>
+
+        <li>
+          <h4>
+            <strong>Password Change</strong>
+          </h4>
+          <p class="indent">
+          <strong>Endpoint:</strong> /api/auth/password/reset/
+          <p class="indent">Authenticated users can change their password by posting a new password to this Endpoint.</p>
+          <ol class="indent">
+            <h4><strong>Process:</strong></h4>
+            <li class="indent">The user submits a request with their new password.</li>
+            <li class="indent">The server verifies the new password and updates the password if valid.</li>
+          </ol>
+          </p>
+        </li>
+
+      </ol>
+      </p>
+
+      <hr />
+      <h3 id="rateLimiting">
+        <strong>C) Rate Limiting <i>(Throttling)</i></strong> -
+        <a href="#toc" class="">top</a>
+      </h3>
+
+      <p>
+      <ol class="indent">
+        <li>
+          <h4>
+            <strong>Sign In</strong>
+          </h4>
+          <p class="indent">
+          As signing in to a service is very important to pay attention to details to prevent hackers from brute forcing any user account, so the signin endpoint allows only <b>15</b> requests per day per valid or anon user
+          </p>
+        </li>
+        <li>
+          <h4>
+            <strong>OTP Request</strong>
+          </h4>
+          <p class="indent">
+          This endpoint allows a valid user to request a new <b>OTP</b> code every after 200-seconds and can make only <b>3 requests per day</b>
+          </p>
+        </li>
+        <li>
+          <h4>
+            <strong>OTP Verification</strong>
+          </h4>
+          <p class="indent">
+            This endpoint allows a valid user to verify <b>OTP</b> code every after 200-seconds and can make only <b>3 requests per day</b>
+          </p>
+        </li>
+        <li>
+          <h4>
+            <strong>Other Endpoints</strong>
+          </h4>
+          <p class="indent">
+          other endpoints have unlimited requests, but if you see that any endpoint needs to be request limited, go to <b>throttling.py</b> and define your custom throttling class as follow
+          <pre class="indent" style="">
+            <code class="language-python line-numbers">
+            
+class CustomRequestThrottle(BaseThrottle):
+    """
+    return True to allow the request else False to throttle it 
+    """
+    valid = 0 
+    if valid:
+        return True
+    else:
+        return False 
+
+    def wait(self):
+       return 200 #seconds to allow to re-request again
+            </code>
+          </pre>
+          <b>Then</b> applying it is as simple as
+<pre class="indent" style="">
+            <code class="language-python line-numbers">
+from .throttling import CustomRequestThrottle
+
+class MyView(APIView):
+    throttle_classes = [CustomRequestThrottle]
+
+    # ... other class methods
+
+             </code>
+          </pre>
+          </p>
+        </li>
+      </ol>
+      </p>
+
+
+      <hr />
+      <h3 id="gettingStarted">
+        <strong>D) Getting Started </strong> -
+        <a href="#toc" class="">top</a>
+      </h3>
+      <p>
+      Here are all available endpoints 
+      <ol class="indent">
+        <li><b>/api/auth/signup/ </b></li>
+        <li><b>/api/auth/signin/ </b></li>
+        <li><b>/api/auth/signout/</b></li>
+        <li><b>/api/auth/otp/  </b></li>
+        <li><b>/api/auth/password/reset/</b></li>
+        <li><b>/api/auth/token/refresh/</b></li>
+      </ol>
+      <br>
+      <b>Signing Up</b>
+      <br>
+      Now let have fun using this auth api,<b> First</b> let create our account to this service, We need to post our credentials to the signup endpoint this will look like this 
+      <br>
+      <pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/signup/
+// Method: POST
+{
+"username":"Kibuulenoah"
+"email":"Kibuulenoah@gmail.com"
+"password1":"just543$#$"
+"password2":"just543$#$"
+}
+        </code>
+      </pre>
+Then lets post the credentials, if any error occurs, a clear error message will be return as the response of what happened <i>ie</i> when some fields are missing of in invalid format
+<br>
+<br>
+<b>Verifing Email Address</b>
+<br>
+If our submitted data is valid, we will get a response like this
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// RESPONSE
+{
+    "message": "OTP sent to email.",
+    "user_id": "&lt;user_id&gt;",
+    "otp_resend_token": "&lt;otp_resend_token&gt;", // used in otp resend request
+}        </code>
+      </pre>
+
+Then email validation is the next step, An OTP code is sent to the submitted email that will be used to activate the newly created account, after receiving the code then submit it as follow
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/otp/
+// Method: POST
+{
+  "user_id":"&lt;user_id&gt;",
+  "otp":"&lt;otp_code&gt;"
+}        
+</code>
+      </pre>
+      <br>
+      <b>Resend OTP Code</b>
+      <br>
+      If your want to request a new OTP code &ldquo;<i>remeber now only 2 request are remaining for today</i> &rdquo;
+      <br>
+      To get a new otp wait 200secs from the last requested OTP code then make a GET request to the OTP endpoint with the recent response <b>otp_resend_token and user_id</b> as follow
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/otp/
+// Method: GET
+{
+  "user_id": "&lt;user_id&gt;",
+  "otp_resend_token": "&lt;otp_resend_token&gt;", // used in otp resend request
+}        </code>
+      </pre>
+      If you sent valid data then you will get a response will the access and refresh tokens as follows
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// RESPONSE
+{
+  "refresh":"&lt;refresh_token&gt;",
+  "access":"&lt;access_token&gt;"
+}        
+  </code>
+      </pre>
+    <br>
+    <b>Signing Out</b>
+    <br>
+    Now it's time to signout of this service and it's so easy as posting the <b>refresh_token</b> to the signout endpoint
+    <pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/signout/
+// Method: POST
+
+{
+  "refresh_token":"&lt;refresh_token&gt;",
+}
+</code>
+      </pre>
+    As soon as you post your <b>refresh_token</b> to the signout endpoint this refresh_token will be blacklisted 
+      <br>
+      <br>
+      <b>Signing In</b>
+      <br>
+      But haaaa, we need some thing from this service, so we need to signin to it to access the resources, so we need to send a post request to the signin endpoint with our credentials and it will look like the following
+ <pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/signin/
+// Method: POST
+
+{
+"username":"Kibuulenoah"
+"password":"just543$#$"
+}
+</code>
+      </pre>
+If any error occurs, a clear error message will be return as the response of what happened <i>ie</i> when some fields are missing of in invalid format else a response like this will be returned
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// RESPONSE
+{
+    "message": "OTP sent to email.",
+    "user_id": "&lt;user_id&gt;",
+    "otp_resend_token": "&lt;otp_resend_token&gt;", // used in otp resend request
+}        </code>
+      </pre>
+And An OTP will be sent to your email, Then as before post the otp code as below
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// Endpoint: /api/auth/otp/
+// Method: POST
+{
+  "user_id":"&lt;user_id&gt;",
+  "otp":"&lt;otp_code&gt;"
+}        
+</code>
+      </pre>
+If valid you will receive the refresh and access tokens as response
+<pre class="indent" style="">
+        <code class="language-json line-numbers">
+// RESPONSE
+{
+  "refresh":"&lt;refresh_token&gt;",
+  "access":"&lt;access_token&gt;"
+}        
+  </code>
+      </pre>
+
+      </p>
+
+
+
+
+      <!-- <p> -->
+      <!--   Once again, thank you so much for purchasing this theme. As I said at -->
+      <!--   the beginning, I'd be glad to help you if you have any questions -->
+      <!--   relating to this theme. No guarantees, but I'll do my best to assist. If -->
+      <!--   you have a more general question relating to the themes on ThemeForest, -->
+      <!--   you might consider visiting the forums and asking your question in the -->
+      <!--   "Item Discussion" section. -->
+      <!-- </p> -->
+
+      <p class="append-bottom alt large"><strong>Your Name</strong></p>
+      <p><a href="#toc">Go To Table of Contents</a></p>
+
+      <hr class="space" />
+    </div>
+    <script src="assets/prism/prism.js"></script>
+    <!-- end div .container -->
+  </body>
+</html>
